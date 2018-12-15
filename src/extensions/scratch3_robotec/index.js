@@ -1460,7 +1460,7 @@ class Scratch3RobotecBlocks {
     motorSetPowerAndDirection (args) {
         const port = Cast.toNumber(args.PORT);
         let speed = MathUtil.clamp(Cast.toNumber(args.SPEED), 0, 100);
-        const direction = Ev3Directions[args.DIR].toLowerCase() == "forward"?1:-1;
+        const direction = Ev3Directions[args.DIR].toLowerCase() === "forward"?1:-1;
         this._forEachMotor(port, motorIndex => {
             const motor = this._peripheral.motor(motorIndex);
             if (motor) {
@@ -1477,7 +1477,7 @@ class Scratch3RobotecBlocks {
         this._forEachMotor(port, motorIndex => {
             const motor = this._peripheral.motor(motorIndex);
             if (motor) {
-              if(stop == "break"){
+              if(stop === "break"){
                 motor.break();
               } else {
                 motor.coast();
@@ -1490,12 +1490,12 @@ class Scratch3RobotecBlocks {
         const port = Cast.toNumber(args.PORT);
         let speed = MathUtil.clamp(Cast.toNumber(args.SPEED), 0, 100);
         let degrees = Cast.toNumber(args.DEGREES);
-        const rotate = Ev3Rotates[args.ROTATE].toLowerCase() == "rotate"?"rotate":"rotateTo";
+        const rotate = Ev3Rotates[args.ROTATE].toLowerCase() === "rotate"?"rotate":"rotateTo";
         this._forEachMotor(port, motorIndex => {
             const motor = this._peripheral.motor(motorIndex);
             if (motor) {
                 motor.power = speed;
-                if(rotate == "rotate"){
+                if(rotate === "rotate"){
                   motor.rotate(degrees);
                 } else {
                   motor.rotate(degrees - motor.position);
