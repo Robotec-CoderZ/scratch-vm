@@ -47,6 +47,6 @@ jobs:
         skip_cleanup: true
         script: npm run --silent deploy -- -x -r $GH_PAGES_REPO
 stages:
-- test
+#- test
 - name: release
   if: branch in (master, develop) and type != pull_request
