@@ -95,10 +95,11 @@ const Ev3Device = {
  * @enum {number}
  */
 const Ev3Mode = {
-    touch: 0, // touch
-    color: 1, // ambient
-    ultrasonic: 1, // inch
-    none: 0
+    touch: [0,0,0,0], // touch
+    color: [1,1,1,1], // ambient
+    ultrasonic: [0,0,0,0], // cm
+    gyro:[0,0,0,0],
+    none: [0,0,0,0]
 };
 
 /**
@@ -109,7 +110,8 @@ const Ev3Mode = {
 const Ev3Label = { // TODO: rename?
     touch: 'button',
     color: 'brightness',
-    ultrasonic: 'distance'
+    ultrasonic: 'distance',
+    gyro: 'angle'
 };
 
 /**
@@ -559,9 +561,11 @@ class EV3 {
          * @private
          */
         this._sensors = {
-            distance: 0,
-            brightness: 0,
-            buttons: [0, 0, 0, 0]
+            distance: [0,0,0,0],
+            angle: [0,0,0,0],
+            brightness: [0,0,0,0],
+            buttons: [0, 0, 0, 0],
+            color:[0,0,0,0]
         };
 
         /**
@@ -605,16 +609,110 @@ class EV3 {
         this._pollValues = this._pollValues.bind(this);
     }
 
-    get distance() {
-        let value = this._sensors.distance > 100 ? 100 : this._sensors.distance;
+    distance(port) {
+        let value = 0;
+        if(!port){
+          port = this.findFirst("distance");
+        }
+        if(port == -1){
+          return;
+        }
+        if (Ev3Label[this._sensorPorts[port]] !== "distance"){
+          return;
+        }
+        value = this._sensors.distance[port];
+        value = value > 255 ? 255 : value;
         value = value < 0 ? 0 : value;
         value = Math.round(100 * value) / 100;
 
         return value;
     }
 
-    get brightness() {
-        return this._sensors.brightness;
+    brightness(port) {
+
+        let value = 0;
+        Ev3Label.color = "brightness";
+        if(!port){
+          port = this.findFirst("brightness");
+        }
+        if(port == -1){
+          return;
+        }
+        if (Ev3Label[this._sensorPorts[port]] !== "brightness"){
+          return;
+        }
+        Ev3Mode[this._sensorPorts[port]][port] = 1;
+        value = this._sensors.brightness[port];
+        return value;
+    }
+
+    color(port) {
+        let value = 0;
+        Ev3Label.color = "color";
+        if(!port){
+          port = this.findFirst("color");
+        }
+        if(port == -1){
+          return;
+        }
+        if (Ev3Label[this._sensorPorts[port]] !== "color"){
+          return;
+        }
+        Ev3Mode[this._sensorPorts[port]][port] = 2;
+        value = this._sensors.color[port];
+
+        return value;
+    }
+
+    angle(port) {
+        let value = 0;
+        if(!port){
+          port = this.findFirst("angle");
+        }
+        if(port == -1){
+          return;
+        }
+        if (Ev3Label[this._sensorPorts[port]] !== "angle"){
+          return;
+        }
+        value = this._sensors.angle[port];
+        return value;
+    }
+
+    resetGyro (port){
+      if(!port){
+        port = this.findFirst("angle");
+      }
+      if(port == -1){
+        return;
+      }
+      if (Ev3Label[this._sensorPorts[port]] !== "angle"){
+        return;
+      }
+
+      let oldMode =  Ev3Mode[this._sensorPorts[port]][port];
+      Ev3Mode[this._sensorPorts[port]][port] = 4;
+      const cmd = this.generateCommand(
+          Ev3Command.DIRECT_COMMAND_NO_REPLY, [
+              Ev3Opcode.OPINPUT_READSI,
+              Ev3Opcode.LAYER,
+              port,
+              Ev3Value.DO_NOT_CHANGE_TYPE,
+              Ev3Mode[this._sensorPorts[port]][port],
+              225,
+              0
+          ]
+      );
+      this.send(cmd);
+      Ev3Mode[this._sensorPorts[port]][port] = oldMode;
+    }
+
+    findFirst(val){
+        for(let i=0;i<this._sensorPorts.length;i++){
+          if(val === Ev3Label[this._sensorPorts[i]])
+            return i;
+        }
+        return -1;
     }
 
     /**
@@ -649,9 +747,33 @@ class EV3 {
         this.send(cmd);
     }
 
+    led (color,status) {
+
+      // status 0 OFF, 1 ON, 2 Blinking
+      //color 1 green, 2 red, 3 orange
+      let cmd = 0;
+      if (status){
+        cmd = ((status - 1) * 3) + color;
+      }
+      cmd = this.generateCommand(
+          Ev3Command.DIRECT_COMMAND_NO_REPLY,
+          [
+              0x82,
+              0x1B,
+              Ev3Value.NUM8,
+              cmd
+          ]
+      );
+
+      this.send(cmd);
+
+    }
+
+
     stopAll() {
         this.stopAllMotors();
         this.stopSound();
+        this.led(0,0);
     }
 
     stopSound() {
@@ -843,7 +965,7 @@ class EV3 {
                         byteCommands[index + 1] = Ev3Value.LAYER;
                         byteCommands[index + 2] = i; // PORT
                         byteCommands[index + 3] = Ev3Value.DO_NOT_CHANGE_TYPE;
-                        byteCommands[index + 4] = Ev3Mode[this._sensorPorts[i]];
+                        byteCommands[index + 4] = Ev3Mode[this._sensorPorts[i]][i];
                         byteCommands[index + 5] = 225; // 0xE1 one byte to follow // TODO: document
                         byteCommands[index + 6] = sensorCount * 4; // global index // TODO: document
                         index += 7;
@@ -961,7 +1083,7 @@ class EV3 {
                     this._sensors.buttons[i] = value ? value : 0;
                 } else if (Ev3Label[this._sensorPorts[i]]) { // if valid
                     // Read brightness / distance values and set to 0 if null
-                    this._sensors[Ev3Label[this._sensorPorts[i]]] = value ? value : 0;
+                    this._sensors[Ev3Label[this._sensorPorts[i]]][i] = value ? value : 0;
                 }
                 offset += 4;
             }
@@ -991,9 +1113,11 @@ class EV3 {
         this._sensorPorts = [];
         this._motorPorts = [];
         this._sensors = {
-            distance: 0,
-            brightness: 0,
-            buttons: [0, 0, 0, 0]
+            distance: [0,0,0,0],
+            angle: [0,0,0,0],
+            brightness: [0,0,0,0],
+            buttons: [0, 0, 0, 0],
+            color:[0,0,0,0]
         };
         this._motors = [null, null, null, null];
     }
@@ -1039,6 +1163,30 @@ const Ev3Stops = ['Break', 'Float'];
  * @enum {string}
  */
 const Ev3Rotates = ['Rotate', 'RotateTo'];
+
+/**
+ * Enum for sensor port names.
+ * Note: if changed, will break compatibility with previously saved projects.
+ * @readonly
+ * @enum {string}
+ */
+const Ev3Colors = ['Green', 'Red', 'Orange'];
+
+/**
+ * Enum for sensor port names.
+ * Note: if changed, will break compatibility with previously saved projects.
+ * @readonly
+ * @enum {string}
+ */
+const Ev3LedStatus = ['Off', 'On', 'Blinking', 'Pulse'];
+
+/**
+ * Enum for sensor port names.
+ * Note: if changed, will break compatibility with previously saved projects.
+ * @readonly
+ * @enum {string}
+ */
+const Ev3ColorMode = ['Brightness', 'Color'];
 
 const EV3Blcoks = Scratch3EV3.prototype.getInfo().blocks;
 const RobotecBlocks = [{
@@ -1146,6 +1294,31 @@ const RobotecBlocks = [{
         }
     },
     {
+        opcode: 'twoMotorSpeed',
+        text: formatMessage({
+            id: 'ev3.twoMotorSpeed',
+            default: 'motor [PORT1] + [PORT2] speed [SPEED]',
+            description: 'turn a motor clockwise for some time'
+        }),
+        blockType: BlockType.COMMAND,
+        arguments: {
+            PORT1: {
+                type: ArgumentType.STRING,
+                menu: 'motorPorts',
+                defaultValue: 1
+            },
+            PORT2: {
+                type: ArgumentType.STRING,
+                menu: 'motorPorts',
+                defaultValue: 2
+            },
+            SPEED: {
+                type: ArgumentType.NUMBER,
+                defaultValue: 100
+            }
+        }
+    },
+    {
         opcode: 'twoMotorRotate',
         text: formatMessage({
             id: 'ev3.twoMotorRotate',
@@ -1210,7 +1383,115 @@ const RobotecBlocks = [{
                 defaultValue: 100
             }
         }
-    }
+    },
+    {
+        opcode: 'led',
+        text: formatMessage({
+            id: 'ev3.led',
+            default: 'tuen LED [COLOR] status [STATUS]',
+            description: 'turn a motor clockwise for some time'
+        }),
+        blockType: BlockType.COMMAND,
+        arguments: {
+            COLOR: {
+                type: ArgumentType.STRING,
+                menu: 'colors',
+                defaultValue: 0
+            },
+            STATUS: {
+                type: ArgumentType.STRING,
+                menu: 'ledStatus',
+                defaultValue: 1
+            }
+        }
+    },
+    {
+        opcode: 'resetGyro',
+        text: formatMessage({
+            id: 'ev3.resetGyro',
+            default: 'Reset Gyro At Port [PORT]',
+            description: 'gets measured distance'
+        }),
+        arguments: {
+            PORT: {
+                type: ArgumentType.STRING,
+                menu: 'sensorPorts',
+                defaultValue: 0
+            }
+        }
+    },
+    {
+        opcode: 'getGyro',
+        text: formatMessage({
+            id: 'ev3.getGyro',
+            default: 'get gyro angle at port [PORT]',
+            description: 'gets measured distance'
+        }),
+        blockType: BlockType.REPORTER,
+        arguments: {
+            PORT: {
+                type: ArgumentType.STRING,
+                menu: 'sensorPorts',
+                defaultValue: 0
+            }
+        }
+    },
+    {
+        opcode: 'getUltrasonic',
+        text: formatMessage({
+            id: 'ev3.getUltrasonic',
+            default: 'get ultrasonic distance at port [PORT]',
+            description: 'gets measured distance'
+        }),
+        blockType: BlockType.REPORTER,
+        arguments: {
+            PORT: {
+                type: ArgumentType.STRING,
+                menu: 'sensorPorts',
+                defaultValue: 0
+            }
+        }
+    },
+    {
+        opcode: 'getColorSensor',
+        text: formatMessage({
+            id: 'ev3.getColorSensor',
+            default: 'get color sensor [MODE] at port [PORT]',
+            description: 'gets measured distance'
+        }),
+        blockType: BlockType.REPORTER,
+        arguments: {
+            PORT: {
+                type: ArgumentType.STRING,
+                menu: 'sensorPorts',
+                defaultValue: 0
+            },
+            MODE: {
+                type: ArgumentType.STRING,
+                menu: 'colorMode',
+                defaultValue: 0
+            }
+        }
+    },
+    {
+        opcode: 'getAngle',
+        text: formatMessage({
+            id: 'ev3.getAngle',
+            default: 'angle',
+            description: 'gets measured distance'
+        }),
+        blockType: BlockType.REPORTER
+    },
+    {
+        opcode: 'getColor',
+        text: formatMessage({
+            id: 'ev3.getColor',
+            default: 'color',
+            description: 'gets measured brightness'
+        }),
+        blockType: BlockType.REPORTER
+    },
+
 ];
 const blocks = RobotecBlocks.concat(EV3Blcoks);
 class Scratch3RobotecBlocks {
@@ -1254,171 +1535,16 @@ class Scratch3RobotecBlocks {
             name: 'Robotec EV3',
             blockIconURI: blockIconURI,
             showStatusButton: true,
-            blocks: blocks
-                /*,
-                {
-                    opcode: 'motorTurnCounterClockwise',
-                    text: formatMessage({
-                        id: 'ev3.motorTurnCounterClockwise',
-                        default: 'motor [PORT] turn that way for [TIME] seconds',
-                        description: 'turn a motor counter-clockwise for some time'
-                    }),
-                    blockType: BlockType.COMMAND,
-                    arguments: {
-                        PORT: {
-                            type: ArgumentType.STRING,
-                            menu: 'motorPorts',
-                            defaultValue: 0
-                        },
-                        TIME: {
-                            type: ArgumentType.NUMBER,
-                            defaultValue: 1
-                        }
-                    }
-                },
-                {
-                    opcode: 'motorSetPower',
-                    text: formatMessage({
-                        id: 'ev3.motorSetPower',
-                        default: 'motor [PORT] set power [POWER] %',
-                        description: 'set a motor\'s power to some value'
-                    }),
-                    blockType: BlockType.COMMAND,
-                    arguments: {
-                        PORT: {
-                            type: ArgumentType.STRING,
-                            menu: 'motorPorts',
-                            defaultValue: 0
-                        },
-                        POWER: {
-                            type: ArgumentType.NUMBER,
-                            defaultValue: 100
-                        }
-                    }
-                },
-                {
-                    opcode: 'getMotorPosition',
-                    text: formatMessage({
-                        id: 'ev3.getMotorPosition',
-                        default: 'motor [PORT] position',
-                        description: 'get the measured degrees a motor has turned'
-                    }),
-                    blockType: BlockType.REPORTER,
-                    arguments: {
-                        PORT: {
-                            type: ArgumentType.STRING,
-                            menu: 'motorPorts',
-                            defaultValue: 0
-                        }
-                    }
-                },
-                {
-                    opcode: 'whenButtonPressed',
-                    text: formatMessage({
-                        id: 'ev3.whenButtonPressed',
-                        default: 'when button [PORT] pressed',
-                        description: 'when a button connected to a port is pressed'
-                    }),
-                    blockType: BlockType.HAT,
-                    arguments: {
-                        PORT: {
-                            type: ArgumentType.STRING,
-                            menu: 'sensorPorts',
-                            defaultValue: 0
-                        }
-                    }
-                },
-                {
-                    opcode: 'whenDistanceLessThan',
-                    text: formatMessage({
-                        id: 'ev3.whenDistanceLessThan',
-                        default: 'when distance < [DISTANCE]',
-                        description: 'when the value measured by the distance sensor is less than some value'
-                    }),
-                    blockType: BlockType.HAT,
-                    arguments: {
-                        DISTANCE: {
-                            type: ArgumentType.NUMBER,
-                            defaultValue: 5
-                        }
-                    }
-                },
-                {
-                    opcode: 'whenBrightnessLessThan',
-                    text: formatMessage({
-                        id: 'ev3.whenBrightnessLessThan',
-                        default: 'when brightness < [DISTANCE]',
-                        description: 'when value measured by brightness sensor is less than some value'
-                    }),
-                    blockType: BlockType.HAT,
-                    arguments: {
-                        DISTANCE: {
-                            type: ArgumentType.NUMBER,
-                            defaultValue: 50
-                        }
-                    }
-                },
-                {
-                    opcode: 'buttonPressed',
-                    text: formatMessage({
-                        id: 'ev3.buttonPressed',
-                        default: 'button [PORT] pressed?',
-                        description: 'is a button on some port pressed?'
-                    }),
-                    blockType: BlockType.BOOLEAN,
-                    arguments: {
-                        PORT: {
-                            type: ArgumentType.STRING,
-                            menu: 'sensorPorts',
-                            defaultValue: 0
-                        }
-                    }
-                },
-                {
-                    opcode: 'getDistance',
-                    text: formatMessage({
-                        id: 'ev3.getDistance',
-                        default: 'distance',
-                        description: 'gets measured distance'
-                    }),
-                    blockType: BlockType.REPORTER
-                },
-                {
-                    opcode: 'getBrightness',
-                    text: formatMessage({
-                        id: 'ev3.getBrightness',
-                        default: 'brightness',
-                        description: 'gets measured brightness'
-                    }),
-                    blockType: BlockType.REPORTER
-                },
-                {
-                    opcode: 'beep',
-                    text: formatMessage({
-                        id: 'ev3.beepNote',
-                        default: 'beep note [NOTE] for [TIME] secs',
-                        description: 'play some note on EV3 for some time'
-                    }),
-                    blockType: BlockType.COMMAND,
-                    arguments: {
-                        NOTE: {
-                            type: ArgumentType.NOTE,
-                            defaultValue: 60
-                        },
-                        TIME: {
-                            type: ArgumentType.NUMBER,
-                            defaultValue: 0.5
-                        }
-                    }
-                }
-            ]*/
-                ,
+            blocks: blocks,
             menus: {
                 motorPorts: this._formatMenu(Ev3MotorMenu),
                 sensorPorts: this._formatMenu(Ev3SensorMenu),
                 directions: this._formatMenu(Ev3Directions),
                 stops: this._formatMenu(Ev3Stops),
                 rotates: this._formatMenu(Ev3Rotates),
+                colors: this._formatMenu(Ev3Colors),
+                ledStatus: this._formatMenu(Ev3LedStatus),
+                colorMode: this._formatMenu(Ev3ColorMode),
             }
         };
     }
@@ -1499,6 +1625,30 @@ class Scratch3RobotecBlocks {
         });
     }
 
+    twoMotorSpeed(args) {
+        const port1 = Cast.toNumber(args.PORT1);
+        const port2 = Cast.toNumber(args.PORT2);
+        let speed = MathUtil.clamp(Cast.toNumber(args.SPEED), -100, 100);
+        const direction = speed >= 0 ? 1 : -1;
+        speed = Math.abs(speed);
+        this._forEachMotor(port1, motorIndex => {
+            const motor = this._peripheral.motor(motorIndex);
+            if (motor) {
+                motor.power = speed;
+                motor.direction = direction;
+                motor.turnOn();
+            }
+        });
+        this._forEachMotor(port2, motorIndex => {
+            const motor = this._peripheral.motor(motorIndex);
+            if (motor) {
+                motor.power = speed;
+                motor.direction = direction;
+                motor.turnOn();
+            }
+        });
+    }
+
     twoMotorRotate(args) {
         const port1 = Cast.toNumber(args.PORT1);
         const port2 = Cast.toNumber(args.PORT2);
@@ -1538,13 +1688,48 @@ class Scratch3RobotecBlocks {
         });
     }
 
+    led(args) {
+        const color = Cast.toNumber(args.COLOR);
+        const status = Cast.toNumber(args.STATUS);
+        this._peripheral.led(color+1, status);
+    }
+    getDistance () {
+        return this._peripheral.distance();
+    }
+    getBrightness () {
+        return this._peripheral.brightness();
+    }
+
+    getColor () {
+        return this._peripheral.color();
+    }
+
+    getColorSensor (args) {
+        const port = Cast.toNumber(args.PORT);
+        const mode = Ev3ColorMode[args.MODE].toLowerCase();
+        return this._peripheral[mode](port);
+    }
+
+    getAngle () {
+        return this._peripheral.angle();;
+    }
+
+    getGyro (args){
+      const port = Cast.toNumber(args.PORT);
+      return this._peripheral.angle(port);
+    }
+
+    resetGyro (args){
+      const port = Cast.toNumber(args.PORT);
+      return this._peripheral.resetGyro(port);
+    }
 }
 Scratch3RobotecBlocks.prototype._forEachMotor = Scratch3EV3.prototype._forEachMotor;
 Scratch3RobotecBlocks.prototype._formatMenu = Scratch3EV3.prototype._formatMenu;
 Scratch3RobotecBlocks.prototype.beep = Scratch3EV3.prototype.beep;
 Scratch3RobotecBlocks.prototype._playNoteForPicker = Scratch3EV3.prototype._playNoteForPicker;
-Scratch3RobotecBlocks.prototype.getBrightness = Scratch3EV3.prototype.getBrightness;
-Scratch3RobotecBlocks.prototype.getDistance = Scratch3EV3.prototype.getDistance;
+//Scratch3RobotecBlocks.prototype.getBrightness = Scratch3EV3.prototype.getBrightness;
+//Scratch3RobotecBlocks.prototype.getDistance = Scratch3EV3.prototype.getDistance;
 Scratch3RobotecBlocks.prototype.buttonPressed = Scratch3EV3.prototype.buttonPressed;
 Scratch3RobotecBlocks.prototype.whenBrightnessLessThan = Scratch3EV3.prototype.whenBrightnessLessThan;
 Scratch3RobotecBlocks.prototype.whenDistanceLessThan = Scratch3EV3.prototype.whenDistanceLessThan;
