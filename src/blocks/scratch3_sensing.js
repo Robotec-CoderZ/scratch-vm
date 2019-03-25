@@ -143,6 +143,7 @@ class Scratch3SensingBlocks {
         ));
 
         if (currentlyAsking) {
+            this.runtime.emit('SAY', stopTarget, 'say', '');
             if (this._questionList.length > 0) {
                 this._askNextQuestion();
             } else {
@@ -190,6 +191,7 @@ class Scratch3SensingBlocks {
             targetX = util.ioQuery('mouse', 'getScratchX');
             targetY = util.ioQuery('mouse', 'getScratchY');
         } else {
+            args.DISTANCETOMENU = Cast.toString(args.DISTANCETOMENU);
             const distTarget = this.runtime.getSpriteTargetByName(
                 args.DISTANCETOMENU
             );
@@ -281,6 +283,7 @@ class Scratch3SensingBlocks {
         if (args.OBJECT === '_stage_') {
             attrTarget = this.runtime.getTargetForStage();
         } else {
+            args.OBJECT = Cast.toString(args.OBJECT);
             attrTarget = this.runtime.getSpriteTargetByName(args.OBJECT);
         }
 
@@ -313,12 +316,11 @@ class Scratch3SensingBlocks {
             }
         }
 
-        // Variables
+        // Target variables.
         const varName = args.PROPERTY;
-        for (const id in attrTarget.variables) {
-            if (attrTarget.variables[id].name === varName) {
-                return attrTarget.variables[id].value;
-            }
+        const variable = attrTarget.lookupVariableByNameAndType(varName, '', true);
+        if (variable) {
+            return variable.value;
         }
 
         // Otherwise, 0

@@ -4,6 +4,7 @@ const RenderedTarget = require('../sprites/rendered-target');
 const uid = require('../util/uid');
 const StageLayering = require('../engine/stage-layering');
 const getMonitorIdForBlockWithArgs = require('../util/get-monitor-id');
+const MathUtil = require('../util/math-util');
 
 /**
  * @typedef {object} BubbleState - the bubble state associated with a particular target.
@@ -65,6 +66,22 @@ class Scratch3LooksBlocks {
      */
     static get SAY_BUBBLE_LIMIT () {
         return 330;
+    }
+
+    /**
+     * Limit for ghost effect
+     * @const {object}
+     */
+    static get EFFECT_GHOST_LIMIT (){
+        return {min: 0, max: 100};
+    }
+
+    /**
+     * Limit for brightness effect
+     * @const {object}
+     */
+    static get EFFECT_BRIGHTNESS_LIMIT (){
+        return {min: -100, max: 100};
     }
 
     /**
@@ -475,17 +492,36 @@ class Scratch3LooksBlocks {
         );
     }
 
+    clampEffect (effect, value) {
+        let clampedValue = value;
+        switch (effect) {
+        case 'ghost':
+            clampedValue = MathUtil.clamp(value,
+                Scratch3LooksBlocks.EFFECT_GHOST_LIMIT.min,
+                Scratch3LooksBlocks.EFFECT_GHOST_LIMIT.max);
+            break;
+        case 'brightness':
+            clampedValue = MathUtil.clamp(value,
+                Scratch3LooksBlocks.EFFECT_BRIGHTNESS_LIMIT.min,
+                Scratch3LooksBlocks.EFFECT_BRIGHTNESS_LIMIT.max);
+            break;
+        }
+        return clampedValue;
+    }
+
     changeEffect (args, util) {
         const effect = Cast.toString(args.EFFECT).toLowerCase();
         const change = Cast.toNumber(args.CHANGE);
         if (!util.target.effects.hasOwnProperty(effect)) return;
-        const newValue = change + util.target.effects[effect];
+        let newValue = change + util.target.effects[effect];
+        newValue = this.clampEffect(effect, newValue);
         util.target.setEffect(effect, newValue);
     }
 
     setEffect (args, util) {
         const effect = Cast.toString(args.EFFECT).toLowerCase();
-        const value = Cast.toNumber(args.VALUE);
+        let value = Cast.toNumber(args.VALUE);
+        value = this.clampEffect(effect, value);
         util.target.setEffect(effect, value);
     }
 

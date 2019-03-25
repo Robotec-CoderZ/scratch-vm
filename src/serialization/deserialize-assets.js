@@ -26,7 +26,13 @@ const deserializeSound = function (sound, runtime, zip, assetFileName) {
         return Promise.resolve(null);
     }
 
-    const soundFile = zip.file(fileName);
+    let soundFile = zip.file(fileName);
+    if (!soundFile) {
+        // look for assetfile in a flat list of files, or in a folder
+        const fileMatch = new RegExp(`^([^/]*/)?${fileName}$`);
+        soundFile = zip.file(fileMatch)[0]; // use first matching file
+    }
+
     if (!soundFile) {
         log.error(`Could not find sound file associated with the ${sound.name} sound.`);
         return Promise.resolve(null);
@@ -43,8 +49,14 @@ const deserializeSound = function (sound, runtime, zip, assetFileName) {
         storage.AssetType.Sound,
         dataFormat,
         data,
-        sound.assetId
-    ));
+        null,
+        true
+    ))
+        .then(asset => {
+            sound.asset = asset;
+            sound.assetId = asset.assetId;
+            sound.md5 = `${asset.assetId}.${asset.dataFormat}`;
+        });
 };
 
 /**
@@ -80,9 +92,12 @@ const deserializeCostume = function (costume, runtime, zip, assetFileName, textL
             costume.asset.assetType,
             costume.asset.dataFormat,
             new Uint8Array(Object.keys(costume.asset.data).map(key => costume.asset.data[key])),
-            costume.asset.assetId
+            null,
+            true
         )).then(asset => {
             costume.asset = asset;
+            costume.assetId = asset.assetId;
+            costume.md5 = `${asset.assetId}.${asset.dataFormat}`;
         });
     }
 
@@ -91,7 +106,13 @@ const deserializeCostume = function (costume, runtime, zip, assetFileName, textL
         return Promise.resolve(null);
     }
 
-    const costumeFile = zip.file(fileName);
+    let costumeFile = zip.file(fileName);
+    if (!costumeFile) {
+        // look for assetfile in a flat list of files, or in a folder
+        const fileMatch = new RegExp(`^([^/]*/)?${fileName}$`);
+        costumeFile = zip.file(fileMatch)[0]; // use the first matched file
+    }
+
     if (!costumeFile) {
         log.error(`Could not find costume file associated with the ${costume.name} costume.`);
         return Promise.resolve(null);
@@ -140,10 +161,13 @@ const deserializeCostume = function (costume, runtime, zip, assetFileName, textL
                 // TODO eventually we want to map non-png's to their actual file types?
                 costumeFormat,
                 data,
-                assetId
+                null,
+                true
             ))
             .then(asset => {
                 costume.asset = asset;
+                costume.assetId = asset.assetId;
+                costume.md5 = `${asset.assetId}.${asset.dataFormat}`;
             })
     ]);
 };

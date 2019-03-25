@@ -1,10 +1,14 @@
-const test = require('tap').test;
+const tap = require('tap');
 const path = require('path');
 const readFileToBuffer = require('../fixtures/readProjectFile').readFileToBuffer;
 const VirtualMachine = require('../../src/virtual-machine');
 const Runtime = require('../../src/engine/runtime');
 const MonitorRecord = require('../../src/engine/monitor-record');
 const {Map} = require('immutable');
+
+tap.tearDown(() => process.nextTick(process.exit));
+
+const test = tap.test;
 
 test('spec', t => {
     const r = new Runtime();
@@ -135,7 +139,7 @@ test('Project loaded emits runtime event', t => {
     });
 });
 
-test('Cloud variable limit allows only 8 cloud variables', t => {
+test('Cloud variable limit allows only 10 cloud variables', t => {
     // This is a test of just the cloud variable limit mechanism
     // The functions being tested below need to be used when
     // creating and deleting cloud variables in the runtime.
@@ -144,7 +148,7 @@ test('Cloud variable limit allows only 8 cloud variables', t => {
 
     t.equal(rt.hasCloudData(), false);
 
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 10; i++) {
         t.equal(rt.canAddCloudVariable(), true);
         rt.addCloudVariable();
         // Adding a cloud variable should change the
@@ -168,7 +172,7 @@ test('Cloud variable limit allows only 8 cloud variables', t => {
     rt.dispose();
     t.equal(rt.hasCloudData(), false);
 
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 10; i++) {
         t.equal(rt.canAddCloudVariable(), true);
         rt.addCloudVariable();
         t.equal(rt.hasCloudData(), true);
@@ -179,4 +183,70 @@ test('Cloud variable limit allows only 8 cloud variables', t => {
 
     t.end();
 
+});
+
+test('Starting the runtime emits an event', t => {
+    let started = false;
+    const rt = new Runtime();
+    rt.addListener('RUNTIME_STARTED', () => {
+        started = true;
+    });
+    rt.start();
+    t.equal(started, true);
+    t.end();
+});
+
+test('Runtime cannot be started while already running', t => {
+    const rt = new Runtime();
+    rt.start(); // Start the first time
+
+    // Set up a flag/listener to check if it can be started again
+    let started = false;
+    rt.addListener('RUNTIME_STARTED', () => {
+        started = true;
+    });
+
+    // Starting again should not emit another event
+    rt.start();
+    t.equal(started, false);
+    t.end();
+});
+
+test('setCompatibilityMode restarts if it was already running', t => {
+    const rt = new Runtime();
+    rt.start(); // Start the first time
+
+    // Set up a flag/listener to check if it gets started again
+    let started = false;
+    rt.addListener('RUNTIME_STARTED', () => {
+        started = true;
+    });
+
+    rt.setCompatibilityMode(true);
+    t.equal(started, true);
+    t.end();
+});
+
+test('setCompatibilityMode does not restart if it was not running', t => {
+    const rt = new Runtime();
+
+    let started = false;
+    rt.addListener('RUNTIME_STARTED', () => {
+        started = true;
+    });
+
+    rt.setCompatibilityMode(true);
+    t.equal(started, false);
+    t.end();
+});
+
+test('Disposing the runtime emits an event', t => {
+    let disposed = false;
+    const rt = new Runtime();
+    rt.addListener('RUNTIME_DISPOSED', () => {
+        disposed = true;
+    });
+    rt.dispose();
+    t.equal(disposed, true);
+    t.end();
 });
