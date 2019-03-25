@@ -1,3 +1,4 @@
+const Scratch3EV3 = require('../scratch3_ev3/index');
 const ArgumentType = require('../../extension-support/argument-type');
 const BlockType = require('../../extension-support/block-type');
 const Cast = require('../../util/cast');
@@ -7,7 +8,6 @@ const BT = require('../../io/bt');
 const Base64Util = require('../../util/base64-util');
 const MathUtil = require('../../util/math-util');
 const log = require('../../util/log');
-const Scratch3EV3 = require('../scratch3_ev3/index');
 
 /**
  * Icon svg to be displayed at the left edge of each extension block, encoded as a data URI.
@@ -1165,438 +1165,7 @@ const Ev3SensorMenu = ['1', '2', '3', '4'];
  */
 const Ev3Directions = ['Forward', 'Backward'];
 
-/**
- * Enum for sensor port names.
- * Note: if changed, will break compatibility with previously saved projects.
- * @readonly
- * @enum {string}
- */
-const Ev3Stops = ['Break', 'Float'];
 
-/**
- * Enum for sensor port names.
- * Note: if changed, will break compatibility with previously saved projects.
- * @readonly
- * @enum {string}
- */
-const Ev3Rotates = ['Rotate', 'RotateTo'];
-
-/**
- * Enum for sensor port names.
- * Note: if changed, will break compatibility with previously saved projects.
- * @readonly
- * @enum {string}
- */
-const Ev3Colors = ['Green', 'Red', 'Orange'];
-
-/**
- * Enum for sensor port names.
- * Note: if changed, will break compatibility with previously saved projects.
- * @readonly
- * @enum {string}
- */
-const Ev3LedStatus = ['Off', 'On', 'Blinking', 'Pulse'];
-
-/**
- * Enum for sensor port names.
- * Note: if changed, will break compatibility with previously saved projects.
- * @readonly
- * @enum {string}
- */
-const Ev3ColorMode = ['Brightness', 'Color'];
-
-/**
- * Enum for sensor port names.
- * Note: if changed, will break compatibility with previously saved projects.
- * @readonly
- * @enum {string}
- */
-const Ev3RotateUnits = ['Seconds', 'Degrees', 'Motor Counts'];
-
-const EV3Blcoks = Scratch3EV3.prototype.getInfo().blocks;
-let RobotecBlocks = [{
-        opcode: 'twoMotorRotate',
-        text: formatMessage({
-            id: 'ev3.twoMotorRotate',
-            default: 'motor [PORT1] + [PORT2] rotate [UNITS] [TYPE] speed left [SPEED1] right [SPEED2]',
-            description: 'turn a motor clockwise for some time'
-        }),
-        blockType: BlockType.COMMAND,
-        arguments: {
-            PORT1: {
-                type: ArgumentType.STRING,
-                menu: 'motorPorts',
-                defaultValue: 1
-            },
-            PORT2: {
-                type: ArgumentType.STRING,
-                menu: 'motorPorts',
-                defaultValue: 2
-            },
-            UNITS: {
-                type: ArgumentType.NUMBER,
-                defaultValue: 1
-            },
-            TYPE: {
-                type: ArgumentType.STRING,
-                menu: 'rotateTypes',
-                defaultValue: 0
-            },
-            SPEED1: {
-                type: ArgumentType.NUMBER,
-                defaultValue: 100
-            },
-            SPEED2: {
-                type: ArgumentType.NUMBER,
-                defaultValue: 100
-            }
-        }
-    },
-    {
-        opcode: 'twoMotorSpeed',
-        text: formatMessage({
-            id: 'ev3.twoMotorSpeed',
-            default: 'motor [PORT1] + [PORT2] speed [SPEED]',
-            description: 'turn a motor clockwise for some time'
-        }),
-        blockType: BlockType.COMMAND,
-        arguments: {
-            PORT1: {
-                type: ArgumentType.STRING,
-                menu: 'motorPorts',
-                defaultValue: 1
-            },
-            PORT2: {
-                type: ArgumentType.STRING,
-                menu: 'motorPorts',
-                defaultValue: 2
-            },
-            SPEED: {
-                type: ArgumentType.NUMBER,
-                defaultValue: 100
-            }
-        }
-    },
-    {
-        opcode: 'motorStop',
-        text: formatMessage({
-            id: 'ev3.motorStop',
-            default: 'Stop motor [PORT] [STOP]',
-            description: 'turn a motor clockwise for some time'
-        }),
-        blockType: BlockType.COMMAND,
-        arguments: {
-            PORT: {
-                type: ArgumentType.STRING,
-                menu: 'motorPorts',
-                defaultValue: 0
-            },
-            STOP: {
-                type: ArgumentType.STRING,
-                menu: 'stops',
-                defaultValue: 0
-            }
-        }
-    },
-    {
-        opcode: 'twoMotorStop',
-        text: formatMessage({
-            id: 'ev3.twoMotorStop',
-            default: 'Stop motor [PORT1] + [PORT2] [STOP]',
-            description: 'turn a motor clockwise for some time'
-        }),
-        blockType: BlockType.COMMAND,
-        arguments: {
-            PORT1: {
-                type: ArgumentType.STRING,
-                menu: 'motorPorts',
-                defaultValue: 1
-            },
-            PORT2: {
-                type: ArgumentType.STRING,
-                menu: 'motorPorts',
-                defaultValue: 2
-            },
-            STOP: {
-                type: ArgumentType.STRING,
-                menu: 'stops',
-                defaultValue: 0
-            }
-        }
-    },
-    {
-        opcode: 'motorSetRotate',
-        text: formatMessage({
-            id: 'ev3.motorSetRotate',
-            default: 'motor [PORT] rotate [UNITS] [TYPE] speed [SPEED]',
-            description: 'turn a motor clockwise for some time'
-        }),
-        blockType: BlockType.COMMAND,
-        arguments: {
-            PORT: {
-                type: ArgumentType.STRING,
-                menu: 'motorPorts',
-                defaultValue: 0
-            },
-            UNITS: {
-                type: ArgumentType.NUMBER,
-                defaultValue: 1
-            },
-            TYPE: {
-                type: ArgumentType.STRING,
-                menu: 'rotateTypes',
-                defaultValue: 0
-            },
-            SPEED: {
-                type: ArgumentType.NUMBER,
-                defaultValue: 100
-            }
-        }
-    },
-    /*{
-  opcode: 'motorSetPower',
-  text: formatMessage({
-  id: 'ev3.motorSetPower',
-  default: 'Run motor [PORT] speed [SPEED]',
-  description: 'turn a motor clockwise for some time'
-}),
-blockType: BlockType.COMMAND,
-arguments: {
-PORT: {
-type: ArgumentType.STRING,
-menu: 'motorPorts',
-defaultValue: 0
-},
-SPEED: {
-type: ArgumentType.NUMBER,
-defaultValue: 100
-}
-}
-},*/
-    /*{
-    opcode: 'motorTurnClockwise2motors',
-    text: formatMessage({
-    id: 'ev3.motorTurnClockwise2motors',
-    default: 'motor [PORT1] motor [PORT2] set speed [SPEED] for [TIME] seconds',
-    description: 'turn a motor clockwise for some time'
-    }),
-    blockType: BlockType.COMMAND,
-    arguments: {
-    PORT1: {
-    type: ArgumentType.STRING,
-    menu: 'motorPorts',
-    defaultValue: 0
-    },
-    PORT2: {
-    type: ArgumentType.STRING,
-    menu: 'motorPorts',
-    defaultValue: 1
-    },
-    SPEED: {
-    type: ArgumentType.NUMBER,
-    defaultValue: 100
-    },
-    TIME: {
-    type: ArgumentType.NUMBER,
-    defaultValue: 1
-    }
-    }
-    },*/
-    /*  {
-    opcode: 'motorRotate',
-    text: formatMessage({
-    id: 'ev3.motorRotate',
-    default: 'motor [PORT] [ROTATE] [DEGREES] at speed [SPEED]',
-    description: 'turn a motor clockwise for some time'
-    }),
-    blockType: BlockType.COMMAND,
-    arguments: {
-    PORT: {
-    type: ArgumentType.STRING,
-    menu: 'motorPorts',
-    defaultValue: 0
-    },
-    ROTATE: {
-    type: ArgumentType.STRING,
-    menu: 'rotates',
-    defaultValue: 0
-    },
-    DEGREES: {
-    type: ArgumentType.NUMBER,
-    defaultValue: 360
-    },
-    SPEED: {
-    type: ArgumentType.NUMBER,
-    defaultValue: 100
-    }
-    }
-    },*/
-    /*{
-    opcode: 'twoMotorRotateCount',
-    text: formatMessage({
-    id: 'ev3.twoMotorRotateCount',
-    default: 'motor [PORT1] + [PORT2] rotate [COUNT] motor counts speed right [SPEED1] left [SPEED2]',
-    description: 'turn a motor clockwise for some time'
-    }),
-    blockType: BlockType.COMMAND,
-    arguments: {
-    PORT1: {
-    type: ArgumentType.STRING,
-    menu: 'motorPorts',
-    defaultValue: 1
-    },
-    PORT2: {
-    type: ArgumentType.STRING,
-    menu: 'motorPorts',
-    defaultValue: 2
-    },
-    COUNT: {
-    type: ArgumentType.NUMBER,
-    defaultValue: 1
-    },
-    SPEED1: {
-    type: ArgumentType.NUMBER,
-    defaultValue: 100
-    },
-    SPEED2: {
-    type: ArgumentType.NUMBER,
-    defaultValue: 100
-    }
-    }
-    },*/
-    {
-        import: 'motorSetPower'
-    },
-    {
-        opcode: 'led',
-        text: formatMessage({
-            id: 'ev3.led',
-            default: 'tuen LED [COLOR] status [STATUS]',
-            description: 'turn a motor clockwise for some time'
-        }),
-        blockType: BlockType.COMMAND,
-        arguments: {
-            COLOR: {
-                type: ArgumentType.STRING,
-                menu: 'colors',
-                defaultValue: 0
-            },
-            STATUS: {
-                type: ArgumentType.STRING,
-                menu: 'ledStatus',
-                defaultValue: 1
-            }
-        }
-    },
-    {
-        import: 'buttonPressed'
-    },
-    {
-        opcode: 'getUltrasonic',
-        text: formatMessage({
-            id: 'ev3.getUltrasonic',
-            default: 'get ultrasonic distance at port [PORT]',
-            description: 'gets measured distance'
-        }),
-        blockType: BlockType.REPORTER,
-        arguments: {
-            PORT: {
-                type: ArgumentType.STRING,
-                menu: 'sensorPorts',
-                defaultValue: 0
-            }
-        }
-    },
-    {
-        opcode: 'getColorSensor',
-        text: formatMessage({
-            id: 'ev3.getColorSensor',
-            default: 'get color sensor [MODE] at port [PORT]',
-            description: 'gets measured distance'
-        }),
-        blockType: BlockType.REPORTER,
-        arguments: {
-            PORT: {
-                type: ArgumentType.STRING,
-                menu: 'sensorPorts',
-                defaultValue: 0
-            },
-            MODE: {
-                type: ArgumentType.STRING,
-                menu: 'colorMode',
-                defaultValue: 0
-            }
-        }
-    },
-    {
-        opcode: 'getGyro',
-        text: formatMessage({
-            id: 'ev3.getGyro',
-            default: 'get gyro angle at port [PORT]',
-            description: 'gets measured distance'
-        }),
-        blockType: BlockType.REPORTER,
-        arguments: {
-            PORT: {
-                type: ArgumentType.STRING,
-                menu: 'sensorPorts',
-                defaultValue: 0
-            }
-        }
-    },
-    {
-        opcode: 'resetGyro',
-        text: formatMessage({
-            id: 'ev3.resetGyro',
-            default: 'Reset Gyro At Port [PORT]',
-            description: 'gets measured distance'
-        }),
-        arguments: {
-            PORT: {
-                type: ArgumentType.STRING,
-                menu: 'sensorPorts',
-                defaultValue: 0
-            }
-        }
-    },
-    /*  {
-    opcode: 'getAngle',
-    text: formatMessage({
-    id: 'ev3.getAngle',
-    default: 'angle',
-    description: 'gets measured distance'
-    }),
-    blockType: BlockType.REPORTER
-    },*/
-    /*  {
-    opcode: 'getColor',
-    text: formatMessage({
-    id: 'ev3.getColor',
-    default: 'color',
-    description: 'gets measured brightness'
-    }),
-    blockType: BlockType.REPORTER
-    }*/
-    {
-        import: 'getMotorPosition'
-    },
-    {
-        import: 'beep'
-    },
-];
-let blocksFormEv3 = [];
-for (let i = 0; i < RobotecBlocks.length; i++) {
-    if (RobotecBlocks[i].import) {
-        blocksFormEv3.push(RobotecBlocks[i].import);
-        for (let j = 0; j < EV3Blcoks.length; j++) {
-            if (EV3Blcoks[j].opcode === RobotecBlocks[i].import) {
-                RobotecBlocks[i] = EV3Blcoks[j];
-                break;
-            }
-        }
-    }
-}
-const blocks = RobotecBlocks;
 class Scratch3RobotecBlocks {
 
     /**
@@ -1633,6 +1202,267 @@ class Scratch3RobotecBlocks {
      * @return {object} Extension description.
      */
     getInfo() {
+        const EV3Blcoks = Scratch3EV3.prototype.getInfo().blocks;
+        let RobotecBlocks = [{
+                opcode: 'twoMotorRotate',
+                text: formatMessage({
+                    id: 'robotec.twoMotorRotate',
+                    default: 'motor [PORT1] + [PORT2] rotate [UNITS] [TYPE] speed left [SPEED1] right [SPEED2]',
+                    description: 'turn a motor clockwise for some time'
+                }),
+                blockType: BlockType.COMMAND,
+                arguments: {
+                    PORT1: {
+                        type: ArgumentType.STRING,
+                        menu: 'motorPorts',
+                        defaultValue: 1
+                    },
+                    PORT2: {
+                        type: ArgumentType.STRING,
+                        menu: 'motorPorts',
+                        defaultValue: 2
+                    },
+                    UNITS: {
+                        type: ArgumentType.NUMBER,
+                        defaultValue: 1
+                    },
+                    TYPE: {
+                        type: ArgumentType.STRING,
+                        menu: 'rotateTypes',
+                        defaultValue: 'seconds'
+                    },
+                    SPEED1: {
+                        type: ArgumentType.NUMBER,
+                        defaultValue: 100
+                    },
+                    SPEED2: {
+                        type: ArgumentType.NUMBER,
+                        defaultValue: 100
+                    }
+                }
+            },
+            { 
+                opcode: 'twoMotorSpeed',
+                text: formatMessage({
+                    id: 'robotec.twoMotorSpeed',
+                    default: 'motor [PORT1] + [PORT2] speed [SPEED]',
+                    description: 'turn a motor clockwise for some time'
+                }),
+                blockType: BlockType.COMMAND,
+                arguments: {
+                    PORT1: {
+                        type: ArgumentType.STRING,
+                        menu: 'motorPorts',
+                        defaultValue: 1
+                    },
+                    PORT2: {
+                        type: ArgumentType.STRING,
+                        menu: 'motorPorts',
+                        defaultValue: 2
+                    },
+                    SPEED: {
+                        type: ArgumentType.NUMBER,
+                        defaultValue: 100
+                    }
+                }
+            },
+            {
+                opcode: 'motorStop',
+                text: formatMessage({
+                    id: 'robotec.motorStop',
+                    default: 'Stop motor [PORT] [STOP]',
+                    description: 'turn a motor clockwise for some time'
+                }),
+                blockType: BlockType.COMMAND,
+                arguments: {
+                    PORT: {
+                        type: ArgumentType.STRING,
+                        menu: 'motorPorts',
+                        defaultValue: 0
+                    },
+                    STOP: {
+                        type: ArgumentType.STRING,
+                        menu: 'stops',
+                        defaultValue: 'break'
+                    }
+                }
+            },
+            {
+                opcode: 'twoMotorStop',
+                text: formatMessage({
+                    id: 'robotec.twoMotorStop',
+                    default: 'Stop motor [PORT1] + [PORT2] [STOP]',
+                    description: 'turn a motor clockwise for some time'
+                }),
+                blockType: BlockType.COMMAND,
+                arguments: {
+                    PORT1: {
+                        type: ArgumentType.STRING,
+                        menu: 'motorPorts',
+                        defaultValue: 1
+                    },
+                    PORT2: {
+                        type: ArgumentType.STRING,
+                        menu: 'motorPorts',
+                        defaultValue: 2
+                    },
+                    STOP: {
+                        type: ArgumentType.STRING,
+                        menu: 'stops',
+                        defaultValue: 'break'
+                    }
+                }
+            },
+            {
+                opcode: 'motorSetRotate',
+                text: formatMessage({
+                    id: 'robotec.motorSetRotate',
+                    default: 'motor [PORT] rotate [UNITS] [TYPE] speed [SPEED]',
+                    description: 'turn a motor clockwise for some time'
+                }),
+                blockType: BlockType.COMMAND,
+                arguments: {
+                    PORT: {
+                        type: ArgumentType.STRING,
+                        menu: 'motorPorts',
+                        defaultValue: 0
+                    },
+                    UNITS: {
+                        type: ArgumentType.NUMBER,
+                        defaultValue: 1
+                    },
+                    TYPE: {
+                        type: ArgumentType.STRING,
+                        menu: 'rotateTypes',
+                        defaultValue: 'seconds'
+                    },
+                    SPEED: {
+                        type: ArgumentType.NUMBER,
+                        defaultValue: 100
+                    }
+                }
+            },
+            {
+                import: 'motorSetPower'
+            },
+            {
+                opcode: 'led',
+                text: formatMessage({
+                    id: 'robotec.led',
+                    default: 'turn LED [COLOR] status [STATUS]',
+                    description: 'turn a motor clockwise for some time'
+                }),
+                blockType: BlockType.COMMAND,
+                arguments: {
+                    COLOR: {
+                        type: ArgumentType.STRING,
+                        menu: 'colors',
+                        defaultValue: 0
+                    },
+                    STATUS: {
+                        type: ArgumentType.STRING,
+                        menu: 'ledStatus',
+                        defaultValue: 1
+                    }
+                }
+            },
+            {
+                import: 'buttonPressed'
+            },
+            {
+                opcode: 'getUltrasonic',
+                text: formatMessage({
+                    id: 'robotec.getUltrasonic',
+                    default: 'get ultrasonic distance at port [PORT]',
+                    description: 'gets measured distance'
+                }),
+                blockType: BlockType.REPORTER,
+                arguments: {
+                    PORT: {
+                        type: ArgumentType.STRING,
+                        menu: 'sensorPorts',
+                        defaultValue: 0
+                    }
+                }
+            },
+            {
+                opcode: 'getColorSensor',
+                text: formatMessage({
+                    id: 'robotec.getColorSensor',
+                    default: 'get color sensor [MODE] at port [PORT]',
+                    description: 'gets measured distance'
+                }),
+                blockType: BlockType.REPORTER,
+                arguments: {
+                    PORT: {
+                        type: ArgumentType.STRING,
+                        menu: 'sensorPorts',
+                        defaultValue: 0
+                    },
+                    MODE: {
+                        type: ArgumentType.STRING,
+                        menu: 'colorMode',
+                        defaultValue: "brightness"
+                    }
+                }
+            },
+            {
+                opcode: 'getGyro',
+                text: formatMessage({
+                    id: 'robotec.getGyro',
+                    default: 'get gyro angle at port [PORT]',
+                    description: 'gets measured distance'
+                }),
+                blockType: BlockType.REPORTER,
+                arguments: {
+                    PORT: {
+                        type: ArgumentType.STRING,
+                        menu: 'sensorPorts',
+                        defaultValue: 0
+                    }
+                }
+            },
+            {
+                opcode: 'resetGyro',
+                text: formatMessage({
+                    id: 'robotec.resetGyro',
+                    default: 'Reset Gyro At Port [PORT]',
+                    description: 'gets measured distance'
+                }),
+                arguments: {
+                    PORT: {
+                        type: ArgumentType.STRING,
+                        menu: 'sensorPorts',
+                        defaultValue: 0
+                    }
+                }
+            },
+            {
+                import: 'getMotorPosition'
+            },
+            {
+                import: 'beep'
+            },
+        ];
+        let blocksFormEv3 = [];
+        for (let i = 0; i < RobotecBlocks.length; i++) {
+            if (RobotecBlocks[i].import) {
+                blocksFormEv3.push(RobotecBlocks[i].import);
+                for (let j = 0; j < EV3Blcoks.length; j++) {
+                    if (EV3Blcoks[j].opcode === RobotecBlocks[i].import) {
+                        RobotecBlocks[i] = EV3Blcoks[j];
+                        break;
+                    }
+                }
+            }
+        }
+        const blocks = RobotecBlocks;
+        for (let i = 0; i < blocksFormEv3.length; i++) {
+            let key = blocksFormEv3[i];
+            if (!Scratch3RobotecBlocks.prototype[key]) {
+                Scratch3RobotecBlocks.prototype[key] = Scratch3EV3.prototype[key];
+            }
+        }
         return {
             id: Scratch3RobotecBlocks.EXTENSION_ID,
             name: 'Robotec EV3',
@@ -1643,12 +1473,82 @@ class Scratch3RobotecBlocks {
                 motorPorts: this._formatMenu(Ev3MotorMenu),
                 sensorPorts: this._formatMenu(Ev3SensorMenu),
                 directions: this._formatMenu(Ev3Directions),
-                stops: this._formatMenu(Ev3Stops),
-                rotates: this._formatMenu(Ev3Rotates),
-                colors: this._formatMenu(Ev3Colors),
-                ledStatus: this._formatMenu(Ev3LedStatus),
-                colorMode: this._formatMenu(Ev3ColorMode),
-                rotateTypes: this._formatMenu(Ev3RotateUnits)
+                stops: [
+                    {"text" : formatMessage({
+                        id: 'robotec.stops.break',
+                        default: 'Break'
+                    }) , "value":'break'},
+                    {"text" : formatMessage({
+                        id: 'robotec.stops.float',
+                        default: 'Float'
+                    }) , "value":'float'}
+                ],
+                /*rotates: [
+                    {"text" : formatMessage({
+                        id: 'robotec.rotate.rotate',
+                        default: 'Rotate'
+                    }) , "value":'rotate'},
+                    {"text" : formatMessage({
+                        id: 'robotec.rotate.rotateTo',
+                        default: 'RotateTo'
+                    }) , "value":'rotateTo'}
+                ],*/
+                colors: [
+                    {"text" : formatMessage({
+                        id: 'robotec.color.green',
+                        default: 'Green'
+                    }) , "value":'0'},
+                    {"text" : formatMessage({
+                        id: 'robotec.color.red',
+                        default: 'Red'
+                    }) , "value":'1'},
+                    {"text" : formatMessage({
+                        id: 'robotec.color.orange',
+                        default: 'Orange'
+                    }) , "value":'2'}
+                ],
+                ledStatus: [
+                    {"text" : formatMessage({
+                        id: 'robotec.ledstatus.off',
+                        default: 'Off'
+                    }) , "value":'0'},
+                    {"text" : formatMessage({
+                        id: 'robotec.ledstatus.on',
+                        default: 'On'
+                    }) , "value":'1'},
+                    {"text" : formatMessage({
+                        id: 'robotec.ledstatus.blinking',
+                        default: 'Blinking'
+                    }) , "value":'2'},
+                    {"text" : formatMessage({
+                        id: 'robotec.ledstatus.pulse',
+                        default: 'Pulse'
+                    }) , "value":'3'}
+                ],
+                colorMode:  [ 
+                    {"text" : formatMessage({
+                        id: 'robotec.colormodes.brightness',
+                        default: 'Brightness'
+                    }) , "value":'brightness'},
+                    {"text" : formatMessage({
+                        id: 'robotec.colormodes.color',
+                        default: 'Color'
+                    }) , "value":'color'}
+                ],
+                rotateTypes: [ 
+                    {"text" : formatMessage({
+                        id: 'robotec.rotateunit.seconds',
+                        default: 'Seconds'
+                    }) , "value":'seconds'},
+                    {"text" : formatMessage({
+                        id: 'robotec.rotateunit.degrees',
+                        default: 'Degrees'
+                    }) , "value":'degrees'},
+                    {"text" : formatMessage({
+                        id: 'robotec.rotateunit.motorCounts',
+                        default: 'Motor Counts'
+                    }) , "value":'motor counts'}
+                ]
             }
         };
     }
@@ -1698,7 +1598,7 @@ class Scratch3RobotecBlocks {
 
     motorStop(args) {
         const port = Cast.toNumber(args.PORT);
-        const stop = Ev3Stops[args.STOP].toLowerCase();
+        const stop = args.STOP;
         this._forEachMotor(port, motorIndex => {
             const motor = this._peripheral.motor(motorIndex);
             if (motor) {
@@ -1714,7 +1614,7 @@ class Scratch3RobotecBlocks {
     twoMotorStop(args) {
         const port1 = Cast.toNumber(args.PORT1);
         const port2 = Cast.toNumber(args.PORT2);
-        const stop = Ev3Stops[args.STOP].toLowerCase();
+        const stop = args.STOP;
         this._forEachMotor(port1, motorIndex => {
             const motor = this._peripheral.motor(motorIndex);
             if (motor) {
@@ -1741,7 +1641,7 @@ class Scratch3RobotecBlocks {
         const port = Cast.toNumber(args.PORT);
         let speed = MathUtil.clamp(Cast.toNumber(args.SPEED), 0, 100);
         let degrees = Cast.toNumber(args.DEGREES);
-        const rotate = Ev3Rotates[args.ROTATE].toLowerCase() === "rotate" ? "rotate" : "rotateTo";
+        const rotate = args.ROTATE;
         this._forEachMotor(port, motorIndex => {
             const motor = this._peripheral.motor(motorIndex);
             if (motor) {
@@ -1783,7 +1683,7 @@ class Scratch3RobotecBlocks {
         const port = Cast.toNumber(args.PORT);
         const speed = MathUtil.clamp(Cast.toNumber(args.SPEED), -100, 100);
         let units = Cast.toNumber(args.UNITS);
-        const type = Ev3RotateUnits[args.TYPE].toLowerCase();
+        const type = args.TYPE;
         let promise = null;
         switch (type) {
             case "seconds":
@@ -1824,7 +1724,7 @@ class Scratch3RobotecBlocks {
         const speed1 = MathUtil.clamp(Cast.toNumber(args.SPEED1), -100, 100);
         const speed2 = MathUtil.clamp(Cast.toNumber(args.SPEED2), -100, 100);
         let units = Cast.toNumber(args.UNITS);
-        const type = Ev3RotateUnits[args.TYPE].toLowerCase();
+        const type = args.TYPE;
         switch (type) {
             case "seconds":
                 let time = units > 0 ? units * 1000 : 0;
@@ -1916,7 +1816,7 @@ class Scratch3RobotecBlocks {
 
     getColorSensor(args) {
         const port = Cast.toNumber(args.PORT);
-        const mode = Ev3ColorMode[args.MODE].toLowerCase();
+        const mode = args.MODE;
         return this._peripheral[mode](port);
     }
 
@@ -1935,12 +1835,7 @@ class Scratch3RobotecBlocks {
     }
 }
 
-for (let i = 0; i < blocksFormEv3.length; i++) {
-    let key = blocksFormEv3[i];
-    if (!Scratch3RobotecBlocks.prototype[key]) {
-        Scratch3RobotecBlocks.prototype[key] = Scratch3EV3.prototype[key];
-    }
-}
+
 
 Scratch3RobotecBlocks.prototype._forEachMotor = Scratch3EV3.prototype._forEachMotor;
 Scratch3RobotecBlocks.prototype._formatMenu = Scratch3EV3.prototype._formatMenu;
