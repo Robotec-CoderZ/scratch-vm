@@ -377,7 +377,7 @@ class EV3Motor {
 
 
     rotate(position) {
-        if (this._power === 0) return;
+        if (this._power === 0)  return ;
 
         const current = this.position  + position;
         const port = this._portMask(this._index);
@@ -432,11 +432,17 @@ class EV3Motor {
 
         this._parent.send(cmd);
 
-        function wait(motor,target,forward,resolve){
+        function wait(motor,target,forward,oldPosition,counter,resolve){
           let position = motor.position;
-          if ((forward && target > position) || (!forward && target < position)){
+          if(position == oldPosition){
+            counter++;
+          } else {
+            counter = 0; 
+          }
+          oldPosition = position;
+          if (counter != 3 && ((forward && target - 5 > position) || (!forward && target + 5 < position))){
             setTimeout(() => {
-              wait(motor,target,forward,resolve)
+              wait(motor,target,forward,oldPosition,counter,resolve)
             },100);
           } else {
             resolve();
@@ -444,7 +450,7 @@ class EV3Motor {
         }
 
         return new Promise(resolve => {
-          wait(this,current,forward,resolve);
+          wait(this,current,forward,null,0,resolve);
         });
 
         //  this.coastAfter(milliseconds);
@@ -1653,6 +1659,9 @@ class Scratch3RobotecBlocks {
                 motor.turnOn();
             }
         });
+        return new Promise(resolve => {
+            setTimeout(resolve, 0);
+        });
     }
 
     motorStop(args) {
@@ -1668,7 +1677,9 @@ class Scratch3RobotecBlocks {
                 }
             }
         });
-
+        return new Promise(resolve => {
+            setTimeout(resolve, 0);
+        });
     }
     twoMotorStop(args) {
         const port1 = Cast.toNumber(args.PORT1);
@@ -1694,7 +1705,9 @@ class Scratch3RobotecBlocks {
                 }
             }
         });
-
+        return new Promise(resolve => {
+            setTimeout(resolve, 0);
+        });
     }
     motorRotate(args) {
         const port = Cast.toNumber(args.PORT);
@@ -1735,6 +1748,9 @@ class Scratch3RobotecBlocks {
                 motor.direction = direction;
                 motor.turnOn();
             }
+        });
+        return new Promise(resolve => {
+            setTimeout(resolve, 0);
         });
     }
 
@@ -1857,6 +1873,9 @@ class Scratch3RobotecBlocks {
         const color = Cast.toNumber(args.COLOR);
         const status = Cast.toNumber(args.STATUS);
         this._peripheral.led(color + 1, status);
+        return new Promise(resolve => {
+            setTimeout(resolve, 0);
+        });
     }
     getDistance() {
         return this._peripheral.distance();
@@ -1900,6 +1919,9 @@ class Scratch3RobotecBlocks {
             if (motor) {
                 motor.resetPosition();
             }
+        });
+        return new Promise(resolve => {
+            setTimeout(resolve, 0);
         });
     }
 }
