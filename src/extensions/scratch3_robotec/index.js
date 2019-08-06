@@ -1651,6 +1651,7 @@ class Scratch3RobotecBlocks {
         const port = Cast.toNumber(args.PORT);
         let speed = MathUtil.clamp(Cast.toNumber(args.POWER), -100, 100);
         const direction = speed >= 0 ? 1 : -1;
+        speed = Math.abs(speed);
         this._forEachMotor(port, motorIndex => {
             const motor = this._peripheral.motor(motorIndex);
             if (motor) {
