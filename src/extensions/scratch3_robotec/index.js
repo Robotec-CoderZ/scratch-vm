@@ -524,7 +524,7 @@ class EV3Motor {
                 Ev3Opcode.OPOUTPUT_STOP,
                 Ev3Value.LAYER,
                 this._portMask(this._index), // port output bit field
-                Ev3Value.BREAK
+                Ev3Value.BRAKE
             ]
         );
 
