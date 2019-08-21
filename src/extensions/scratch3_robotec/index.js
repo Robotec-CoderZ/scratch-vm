@@ -445,7 +445,9 @@ class EV3Motor {
               wait(motor,target,forward,oldPosition,counter,resolve)
             },100);
           } else {
+            setTimeout(() => {
             resolve();
+            },100);
           }
         }
 
@@ -1805,21 +1807,22 @@ class Scratch3RobotecBlocks {
             case "seconds":
                 let time = units > 0 ? units * 1000 : 0;
                 return new Promise(resolve => {
-                    this._forEachMotor(port1, motorIndex => {
-                        const motor = this._peripheral.motor(motorIndex);
-                        if (motor) {
-                            motor.power = Math.abs(speed1);
-                            motor.direction = speed1 > 0 ? 1 : -1;
-                            motor.turnOnFor(time);
-                        }
-                    });
-                    this._forEachMotor(port2, motorIndex => {
-                        const motor = this._peripheral.motor(motorIndex);
-                        if (motor) {
-                            motor.power = Math.abs(speed2);
-                            motor.direction = speed2 > 0 ? 1 : -1;
-                            motor.turnOnFor(time);
-                        }
+                    this._forEachMotor(port1, motorIndex1 => {
+                        this._forEachMotor(port2, motorIndex2 => {
+                            const motor1 = this._peripheral.motor(motorIndex1);
+                            if (motor1) {
+                                motor1.power = Math.abs(speed1);
+                                motor1.direction = speed1 > 0 ? 1 : -1;
+                                motor1.turnOnFor(time);
+                            }
+                            const motor2 = this._peripheral.motor(motorIndex2);
+                            if (motor2) {
+                                motor2.power = Math.abs(speed2);
+                                motor2.direction = speed2 > 0 ? 1 : -1;
+                                motor2.turnOnFor(time);
+                            }
+                        });
+                        
                     });
                     // Run for some time even when no motor is connected
                     setTimeout(resolve, time);
@@ -1847,27 +1850,26 @@ class Scratch3RobotecBlocks {
         let power1 = Math.abs(speed1);
         let power2 = Math.abs(speed2);
         let maxPower = Math.max(Math.max(power1, power2), 1);
-        let promise = null;
-        this._forEachMotor(port1, motorIndex => {
-            const motor = this._peripheral.motor(motorIndex);
-            if (motor) {
-                let dir = speed1 < 0 ? -1 : 1;
-                motor.power = power1;
-                promise = motor.rotate((degrees * (power1 / maxPower)) * dir);
-            }
-        });
-        this._forEachMotor(port2, motorIndex => {
-            const motor = this._peripheral.motor(motorIndex);
-            if (motor) {
-                let dir = speed2 < 0 ? -1 : 1;
-                motor.power = power2;
-                let tmp_promise = motor.rotate((degrees * (power2 / maxPower)) * dir);
-                if (!promise){
-                  promise = tmp_promise;
+        let promise = [];
+        this._forEachMotor(port1, motorIndex1 => {
+            this._forEachMotor(port2, motorIndex2 => {
+                const motor1 = this._peripheral.motor(motorIndex1);
+                const motor2 = this._peripheral.motor(motorIndex2);
+                if (motor1) {
+                    let dir = speed2 < 0 ? -1 : 1;
+                    motor1.power = power1;
+                    promise.push(motor1.rotate((degrees * (power1 / maxPower)) * dir));
                 }
-            }
+                if (motor2) {
+                    let dir = speed1 < 0 ? -1 : 1;
+                    motor2.power = power2;
+                    promise.push(motor2.rotate((degrees * (power2 / maxPower)) * dir));
+                }
+            });
+            
         });
-        return promise;
+       
+        return Promise.all(promise);
     }
 
     led(args) {
