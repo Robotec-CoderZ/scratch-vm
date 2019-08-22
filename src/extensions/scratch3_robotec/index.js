@@ -410,7 +410,7 @@ class EV3Motor {
         const ramp = Math.min(position / 4, Ev3Value.LONG_RAMP);
         let rampup = ramp;
         let rampdown = ramp;
-        position = position - 2 * ramp;
+        position = position - rampup - rampdown;
         // Generate motor command values
         const runcmd = [
             Ev3Value.NUM32,
@@ -424,11 +424,17 @@ class EV3Motor {
             port,
             Ev3Value.NUM8,
             dir & 0xff,
-            Ev3Value.NUM8,
-            rampup
+            Ev3Value.NUM32,
+            rampup & 0xff,
+            (rampup >> 8) & 0xff,
+            (rampup >> 16) & 0xff,
+            (rampup >> 24) & 0xff
         ]).concat(runcmd.concat([
-            Ev3Value.NUM8,
-            rampdown,
+            Ev3Value.NUM32,
+            rampdown & 0xff,
+            (rampdown >> 8) & 0xff,
+            (rampdown >> 16) & 0xff,
+            (rampdown >> 24) & 0xff,
             Ev3Value.BRAKE
         ]));
 
@@ -447,22 +453,18 @@ class EV3Motor {
             counter = 0; 
           }
           oldPosition = position;
-          if (counter != 3 && ((forward && target - 5 > position) || (!forward && target + 5 < position))){
+          if (counter != 20 && ((forward && target - 5 > position) || (!forward && target + 5 < position))){
             setTimeout(() => {
               wait(motor,target,forward,oldPosition,counter,resolve)
             },100);
           } else {
-            setTimeout(() => {
             resolve();
-            },100);
           }
         }
 
         return new Promise(resolve => {
           wait(this,current,forward,null,0,resolve);
         });
-
-        //  this.coastAfter(milliseconds);
     }
 
 
@@ -1880,25 +1882,25 @@ class Scratch3RobotecBlocks {
         let power2 = Math.abs(speed2);
         let maxPower = Math.max(Math.max(power1, power2), 1);
         let promise = [];
-        this._forEachMotor(port1, motorIndex1 => {
-            this._forEachMotor(port2, motorIndex2 => {
-                const motor1 = this._peripheral.motor(motorIndex1);
-                const motor2 = this._peripheral.motor(motorIndex2);
+        const motor1 = this._peripheral.motor(port1);
+        const motor2 = this._peripheral.motor(port2);
                 if (motor1) {
                     let dir = speed2 < 0 ? -1 : 1;
                     motor1.power = power1;
-                    promise.push(motor1.rotate((degrees * (power1 / maxPower)) * dir));
+            let p = motor1.rotate((degrees * (power1 / maxPower)) * dir);
+            if(p){
+                promise.push(p);
+            }
                 }
                 if (motor2) {
                     let dir = speed1 < 0 ? -1 : 1;
                     motor2.power = power2;
-                    promise.push(motor2.rotate((degrees * (power2 / maxPower)) * dir));
+            let p = motor2.rotate((degrees * (power2 / maxPower)) * dir);
+            if(p){
+                promise.push(p);
+            }
                 }
-            });
-            
-        });
-       
-        return Promise.all(promise);
+        return  Promise.all(promise);
     }
 
     led(args) {
