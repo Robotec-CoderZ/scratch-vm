@@ -102,6 +102,13 @@ const Ev3Mode = {
     none: [0, 0, 0, 0]
 };
 
+let Ev3UpdateStatus = {
+    0 : 1,
+    1 : 1,
+    2 : 1,
+    3 : 1
+}
+
 /**
  * Enum for Ev3 device labels used in the Scratch blocks/UI.
  * @readonly
@@ -736,22 +743,44 @@ class EV3 {
         if (Ev3Label[this._sensorPorts[port]] !== "angle") {
             return;
         }
+        if(Ev3UpdateStatus[port] == 0) return;
+        if(this.angle(port) == 0) return
 
         let oldMode = Ev3Mode[this._sensorPorts[port]][port];
         Ev3Mode[this._sensorPorts[port]][port] = 4;
-        const cmd = this.generateCommand(
-            Ev3Command.DIRECT_COMMAND_NO_REPLY, [
-                Ev3Opcode.OPINPUT_READSI,
-                Ev3Opcode.LAYER,
-                port,
-                Ev3Value.DO_NOT_CHANGE_TYPE,
-                Ev3Mode[this._sensorPorts[port]][port],
-                225,
-                0
-            ]
-        );
-        this.send(cmd);
-        Ev3Mode[this._sensorPorts[port]][port] = oldMode;
+        Ev3UpdateStatus[port] = 0;
+       // this._updateDevices = false;
+        function reset(that,port,resolve){
+           
+            const cmd = that.generateCommand(
+                Ev3Command.DIRECT_COMMAND_NO_REPLY, [
+                    Ev3Opcode.OPINPUT_READSI,
+                    Ev3Opcode.LAYER,
+                    port,
+                    Ev3Value.DO_NOT_CHANGE_TYPE,
+                    Ev3Mode[that._sensorPorts[port]][port],
+                    225,
+                    0
+                ]
+            );
+            that.send(cmd);
+
+            setTimeout(() =>{
+                if(that.angle(port) == 0){
+                  //  that._updateDevices = true;
+                    Ev3Mode[that._sensorPorts[port]][port] = oldMode;
+                    Ev3UpdateStatus[port] = 1;
+                    resolve();
+                } else {
+                    reset(that,port,resolve)
+                }
+            },2000)
+
+        }
+        var that = this;
+        return new Promise(resolve => {
+            reset(that,port,resolve);
+          });
     }
 
     findFirst(val) {
@@ -1007,7 +1036,7 @@ class EV3 {
             // eslint-disable-next-line no-undefined
             if (!this._sensorPorts.includes(undefined)) { // TODO: why is this needed?
                 for (let i = 0; i < 4; i++) {
-                    if (this._sensorPorts[i] !== 'none') {
+                    if (this._sensorPorts[i] !== 'none' &&  Ev3UpdateStatus[i]) {
                         byteCommands[index + 0] = Ev3Opcode.OPINPUT_READSI;
                         byteCommands[index + 1] = Ev3Value.LAYER;
                         byteCommands[index + 2] = i; // PORT
