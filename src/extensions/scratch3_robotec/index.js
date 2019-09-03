@@ -1399,7 +1399,12 @@ function getBlocks() {
             }
         },
         {
-            import: 'buttonPressed'
+            import: 'buttonPressed',
+            text: formatMessage({
+                id: 'robotec.buttonPressed',
+                default: 'touch sensor at port [PORT] pressed?',
+                description: 'is a button on some port pressed?'
+            })
         },
         {
             opcode: 'getUltrasonic',
