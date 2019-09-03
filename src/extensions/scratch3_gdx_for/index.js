@@ -81,6 +81,12 @@ const SHAKEN_THRESHOLD = 30;
 const FACING_THRESHOLD = 9;
 
 /**
+ * An offset for the facing threshold, used to check that we are no longer facing up.
+ * @type {number}
+ */
+const FACING_THRESHOLD_OFFSET = 5;
+
+/**
  * Threshold for acceleration magnitude, below which we are in freefall.
  * @type {number}
  */
@@ -128,7 +134,7 @@ class GdxFor {
          * @type {BLE}
          * @private
          */
-        this._scratchLinkSocket = null;
+        this._ble = null;
 
         /**
          * An @vernier/godirect Device
@@ -166,7 +172,7 @@ class GdxFor {
          */
         this._timeoutID = null;
 
-        this.disconnect = this.disconnect.bind(this);
+        this.reset = this.reset.bind(this);
         this._onConnect = this._onConnect.bind(this);
     }
 
@@ -175,18 +181,18 @@ class GdxFor {
      * Called by the runtime when user wants to scan for a peripheral.
      */
     scan () {
-        if (this._scratchLinkSocket) {
-            this._scratchLinkSocket.disconnect();
+        if (this._ble) {
+            this._ble.disconnect();
         }
 
-        this._scratchLinkSocket = new BLE(this._runtime, this._extensionId, {
+        this._ble = new BLE(this._runtime, this._extensionId, {
             filters: [
                 {namePrefix: 'GDX-FOR'}
             ],
             optionalServices: [
                 BLEUUID.service
             ]
-        }, this._onConnect, this.disconnect);
+        }, this._onConnect, this.reset);
     }
 
     /**
@@ -194,8 +200,8 @@ class GdxFor {
      * @param {number} id - the id of the peripheral to connect to.
      */
     connect (id) {
-        if (this._scratchLinkSocket) {
-            this._scratchLinkSocket.connectPeripheral(id);
+        if (this._ble) {
+            this._ble.connectPeripheral(id);
         }
     }
 
@@ -204,7 +210,17 @@ class GdxFor {
      * Disconnect from the GDX FOR.
      */
     disconnect () {
-        window.clearInterval(this._timeoutID);
+        if (this._ble) {
+            this._ble.disconnect();
+        }
+
+        this.reset();
+    }
+
+    /**
+     * Reset all the state and timeout/interval ids.
+     */
+    reset () {
         this._sensors = {
             force: 0,
             accelerationX: 0,
@@ -214,8 +230,10 @@ class GdxFor {
             spinSpeedY: 0,
             spinSpeedZ: 0
         };
-        if (this._scratchLinkSocket) {
-            this._scratchLinkSocket.disconnect();
+
+        if (this._timeoutID) {
+            window.clearInterval(this._timeoutID);
+            this._timeoutID = null;
         }
     }
 
@@ -225,8 +243,8 @@ class GdxFor {
      */
     isConnected () {
         let connected = false;
-        if (this._scratchLinkSocket) {
-            connected = this._scratchLinkSocket.isConnected();
+        if (this._ble) {
+            connected = this._ble.isConnected();
         }
         return connected;
     }
@@ -236,7 +254,7 @@ class GdxFor {
      * @private
      */
     _onConnect () {
-        const adapter = new ScratchLinkDeviceAdapter(this._scratchLinkSocket, BLEUUID);
+        const adapter = new ScratchLinkDeviceAdapter(this._ble, BLEUUID);
         godirect.createDevice(adapter, {open: true, startMeasurements: false}).then(device => {
             // Setup device
             this._device = device;
@@ -256,7 +274,7 @@ class GdxFor {
                     });
                 });
                 this._timeoutID = window.setInterval(
-                    () => this._scratchLinkSocket.handleDisconnectError(BLEDataStoppedError),
+                    () => this._ble.handleDisconnectError(BLEDataStoppedError),
                     BLETimeout
                 );
             });
@@ -300,7 +318,7 @@ class GdxFor {
         // cancel disconnect timeout and start a new one
         window.clearInterval(this._timeoutID);
         this._timeoutID = window.setInterval(
-            () => this._scratchLinkSocket.handleDisconnectError(BLEDataStoppedError),
+            () => this._ble.handleDisconnectError(BLEDataStoppedError),
             BLETimeout
         );
     }
@@ -751,11 +769,26 @@ class Scratch3GdxForBlocks {
                 }
             ],
             menus: {
-                pushPullOptions: this.PUSH_PULL_MENU,
-                gestureOptions: this.GESTURE_MENU,
-                axisOptions: this.AXIS_MENU,
-                tiltOptions: this.TILT_MENU,
-                tiltAnyOptions: this.TILT_MENU_ANY
+                pushPullOptions: {
+                    acceptReporters: true,
+                    items: this.PUSH_PULL_MENU
+                },
+                gestureOptions: {
+                    acceptReporters: true,
+                    items: this.GESTURE_MENU
+                },
+                axisOptions: {
+                    acceptReporters: true,
+                    items: this.AXIS_MENU
+                },
+                tiltOptions: {
+                    acceptReporters: true,
+                    items: this.TILT_MENU
+                },
+                tiltAnyOptions: {
+                    acceptReporters: true,
+                    items: this.TILT_MENU_ANY
+                }
             }
         };
     }
@@ -783,11 +816,40 @@ class Scratch3GdxForBlocks {
         case GestureValues.STARTED_FALLING:
             return this.isFreeFalling();
         case GestureValues.TURNED_FACE_UP:
-            return this._peripheral.getAccelerationZ() > FACING_THRESHOLD;
+            return this._isFacing(GestureValues.TURNED_FACE_UP);
         case GestureValues.TURNED_FACE_DOWN:
-            return this._peripheral.getAccelerationZ() < FACING_THRESHOLD * -1;
+            return this._isFacing(GestureValues.TURNED_FACE_DOWN);
         default:
             log.warn(`unknown gesture value in whenGesture: ${args.GESTURE}`);
+            return false;
+        }
+    }
+
+    _isFacing (direction) {
+        if (typeof this._facingUp === 'undefined') {
+            this._facingUp = false;
+        }
+        if (typeof this._facingDown === 'undefined') {
+            this._facingDown = false;
+        }
+
+        // If the sensor is already facing up or down, reduce the threshold.
+        // This prevents small fluctations in acceleration while it is being
+        // turned from causing the hat block to trigger multiple times.
+        let threshold = FACING_THRESHOLD;
+        if (this._facingUp || this._facingDown) {
+            threshold -= FACING_THRESHOLD_OFFSET;
+        }
+
+        this._facingUp = this._peripheral.getAccelerationZ() > threshold;
+        this._facingDown = this._peripheral.getAccelerationZ() < threshold * -1;
+
+        switch (direction) {
+        case GestureValues.TURNED_FACE_UP:
+            return this._facingUp;
+        case GestureValues.TURNED_FACE_DOWN:
+            return this._facingDown;
+        default:
             return false;
         }
     }

@@ -72,8 +72,7 @@ module.exports = [
         },
         externals: {
             'decode-html': true,
-            'escape-html': true,
-            'format-message': false,
+            'format-message': true,
             'htmlparser2': true,
             'immutable': true,
             'jszip': true,
