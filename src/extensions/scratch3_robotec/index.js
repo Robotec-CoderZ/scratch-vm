@@ -781,7 +781,9 @@ class EV3 {
         }
         var that = this;
         return new Promise(resolve => {
-            reset(that,port,resolve);
+            setTimeout(() =>{
+                reset(that,port,resolve);
+            },2000);
           });
     }
 
