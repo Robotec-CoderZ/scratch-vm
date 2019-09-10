@@ -458,7 +458,9 @@ class EV3Motor {
               wait(motor,target,forward,oldPosition,counter,resolve)
             },100);
           } else {
-            resolve();
+            setTimeout(() => {
+                resolve();
+            },1000);
           }
         }
 
@@ -747,6 +749,7 @@ class EV3 {
         }
         if(Ev3UpdateStatus[port] == 0) return;
         if(this.angle(port) == 0) return
+        this._dontUpdate = true;
 
         let oldMode = Ev3Mode[this._sensorPorts[port]][port];
         Ev3Mode[this._sensorPorts[port]][port] = 4;
@@ -768,15 +771,21 @@ class EV3 {
             that.send(cmd);
 
             setTimeout(() =>{
-                if(that.angle(port) == 0){
-                  //  that._updateDevices = true;
-                    Ev3Mode[that._sensorPorts[port]][port] = oldMode;
-                    Ev3UpdateStatus[port] = 1;
-                    resolve();
-                } else {
-                    reset(that,port,resolve)
-                }
-            },2000)
+                that._dontUpdate = false;
+                Ev3Mode[that._sensorPorts[port]][port] = oldMode;
+                setTimeout(() =>{
+                    if(that.angle(port) == 0){
+                    //  that._updateDevices = true;
+                        Ev3Mode[that._sensorPorts[port]][port] = oldMode;
+                        Ev3UpdateStatus[port] = 1;
+                        resolve();
+                    } else {
+                        that._dontUpdate = true;
+                        Ev3Mode[that._sensorPorts[port]][port] = 4;
+                        reset(that,port,resolve)
+                    }
+                },1000);
+            },1000)
 
         }
         var that = this;
@@ -1014,6 +1023,10 @@ class EV3 {
 
         let sensorCount = 0;
 
+        if(this._dontUpdate){
+            return;
+        }
+
         // For the command to send, either request device list or request sensor data
         // based on the polling counter value.  (i.e., reset the list of devices every
         // 20 counts).
@@ -1040,7 +1053,7 @@ class EV3 {
             // eslint-disable-next-line no-undefined
             if (!this._sensorPorts.includes(undefined)) { // TODO: why is this needed?
                 for (let i = 0; i < 4; i++) {
-                    if (this._sensorPorts[i] !== 'none' &&  Ev3UpdateStatus[i]) {
+                    if (this._sensorPorts[i] !== 'none') {
                         byteCommands[index + 0] = Ev3Opcode.OPINPUT_READSI;
                         byteCommands[index + 1] = Ev3Value.LAYER;
                         byteCommands[index + 2] = i; // PORT
@@ -1234,20 +1247,15 @@ function getBlocks() {
             opcode: 'twoMotorRotate',
             text: formatMessage({
                 id: 'robotec.twoMotorRotate',
-                default: 'motor [PORT1] + [PORT2] rotate [UNITS] [TYPE] speed left [SPEED1] right [SPEED2]',
+                default: 'motor [PORTS] rotate [UNITS] [TYPE] speed left [SPEED1] right [SPEED2]',
                 description: 'turn a motor clockwise for some time'
             }),
             blockType: BlockType.COMMAND,
             arguments: {
-                PORT1: {
+                PORTS: {
                     type: ArgumentType.STRING,
-                    menu: 'motorPorts',
-                    defaultValue: 1
-                },
-                PORT2: {
-                    type: ArgumentType.STRING,
-                    menu: 'motorPorts',
-                    defaultValue: 2
+                    menu: 'twoMotorsPorts',
+                    defaultValue: '1+2'
                 },
                 UNITS: {
                     type: ArgumentType.NUMBER,
@@ -1576,6 +1584,12 @@ class Scratch3RobotecBlocks {
             blocks: getBlocks(),
             menus: {
                 motorPorts: this._formatMenu(Ev3MotorMenu),
+                twoMotorsPorts: [
+                    {"text" : "A + B" , "value":'0+1'},
+                    {"text" : "A + D" , "value":'0+3'},
+                    {"text" : "B + C" , "value":'1+2'},
+                    {"text" : "C + D" , "value":'2+3'}
+                ],
                 sensorPorts: this._formatMenu(Ev3SensorMenu),
                 directions: this._formatMenu(Ev3Directions),
                 stops: [
@@ -1835,8 +1849,9 @@ class Scratch3RobotecBlocks {
     }
 
     twoMotorRotate(args) {
-        const port1 = Cast.toNumber(args.PORT1);
-        const port2 = Cast.toNumber(args.PORT2);
+        const ports = args.PORTS.split('+');
+        const port1 = Cast.toNumber(ports[0]);
+        const port2 = Cast.toNumber(ports[1]);
         const speed1 = MathUtil.clamp(Cast.toNumber(args.SPEED1), -100, 100);
         const speed2 = MathUtil.clamp(Cast.toNumber(args.SPEED2), -100, 100);
         let units = Cast.toNumber(args.UNITS);
@@ -1891,22 +1906,22 @@ class Scratch3RobotecBlocks {
         let promise = [];
         const motor1 = this._peripheral.motor(port1);
         const motor2 = this._peripheral.motor(port2);
-                if (motor1) {
-                    let dir = speed2 < 0 ? -1 : 1;
-                    motor1.power = power1;
+        if (motor1) {
+            let dir = speed1 < 0 ? -1 : 1;
+            motor1.power = power1;
             let p = motor1.rotate((degrees * (power1 / maxPower)) * dir);
             if(p){
                 promise.push(p);
             }
-                }
-                if (motor2) {
-                    let dir = speed1 < 0 ? -1 : 1;
-                    motor2.power = power2;
+        }
+        if (motor2) {
+            let dir = speed2 < 0 ? -1 : 1;
+            motor2.power = power2;
             let p = motor2.rotate((degrees * (power2 / maxPower)) * dir);
             if(p){
                 promise.push(p);
             }
-                }
+        }
         return  Promise.all(promise);
     }
 
